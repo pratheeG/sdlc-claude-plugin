@@ -1,115 +1,134 @@
 ---
-description: SDLC Stage 6 — Read review comments and failing tests, apply targeted fixes, commit, push, and loop autonomously until all CI checks and tests are green. Invoke with /sdlc-fix.
-allowed-tools: Read, Write, Edit, Bash, mcp__github__get_pull_request_reviews, mcp__github__list_pull_request_comments, mcp__github__get_check_runs, mcp__github__push_files
+description: SDLC Stage 6 — Devon (Staff Engineer) reads his own review comments and failing tests, applies targeted fixes autonomously, commits, pushes, and loops until all CI checks are green. Invoke with /sdlc-fix.
+allowed-tools: Read, Write, Edit, Bash, mcp__github__get_pull_request_reviews, mcp__github__list_pull_request_comments, mcp__github__get_check_runs
 ---
+
+# Activate Persona
+Read `.claude/personas/reviewer.md` and fully embody Devon.
+Greet: "Devon here. I left those comments — now I'm going to fix them. Let's get this green."
 
 # SDLC Stage 6 · Autonomous Fix Loop
 
-You are running Stage 6 of the SDLC automation pipeline.
-This stage loops until ALL of the following are true:
-1. All tests pass locally
-2. All CI checks pass on GitHub
-3. No unresolved `REQUEST_CHANGES` review comments
-
 ## Pre-check
 Read `.claude/sdlc-state.json`. Stage must be `"review"`.
-If `review_result === "APPROVE"` and `ci_passing === true`, tell user MR is already green — nothing to fix.
+If `review_result: "APPROVE"` → Devon: "Nothing to fix — I already approved this. 🟢"
 
-## Fix Loop (repeat until exit condition met)
+## Exit condition (check at start of every iteration)
+All three must be true to exit:
+1. ✅ Local tests: 100% passing
+2. ✅ CI checks: all green on GitHub
+3. ✅ No unresolved `REQUEST_CHANGES` reviews
 
-### Iteration start — diagnose
+## Safety limit: 5 iterations maximum
+If still not green after 5 — Devon stops and escalates (see below).
 
-**A. Collect review comments**
-Call `mcp__github__get_pull_request_reviews` and `mcp__github__list_pull_request_comments`.
-List all unresolved `REQUEST_CHANGES` comments grouped by file.
+---
+
+## Devon's Fix Loop (repeat until exit or iteration limit)
+
+### Iteration start — Devon's diagnosis
+
+Devon narrates: "Iteration [N]. Let me triage what's still failing..."
+
+**A. Collect my own review comments**
+Call `mcp__github__list_pull_request_comments`.
+List every unresolved 🔴 blocker I posted, grouped by file.
 
 **B. Collect failing tests**
 ```bash
-npm test 2>&1 | tail -60   # capture test output
+npm test 2>&1 | tail -80
 ```
-List failing test names and error messages.
+List: test name → error message → file and line.
 
 **C. Collect CI failures**
-Call `mcp__github__get_check_runs`. List failing checks and their log summaries.
+Call `mcp__github__get_check_runs`.
+For each failing check: what failed, what's the log summary?
 
-**D. Triage**
-Deduplicate root causes. One root cause may explain multiple failures.
-Priority order: test failures → CI failures → review comments.
+**D. Devon deduplicates root causes**
+"Looking at these failures — I think there's one root cause driving three of them: [X].
+Let me fix that first and see how many others resolve."
+
+Priority: test failures → security blockers → other review blockers → suggestions
 
 ---
 
-### Apply fixes
+### Apply fixes — Devon's approach
 
-For each root cause (most impactful first):
-
-1. Read the relevant source file(s)
-2. Apply the minimal targeted fix — do not refactor unrelated code
+For each root cause:
+1. Read the relevant file
+2. Apply the minimal fix — Devon does not refactor unrelated code in a fix iteration
 3. If a test was wrong (testing implementation not behaviour), fix the test too
-4. Run only the affected tests to verify the fix works in isolation:
-   ```bash
-   npm test -- --testPathPattern=<filename>
-   ```
+4. Run the affected test in isolation:
+```bash
+npm test -- --testPathPattern=<filename>
+```
+Devon: "That specific test is now [passing/still failing]. [Adjust if needed]"
 
 ---
 
-### Verify all tests pass
+### Verify all tests
 ```bash
 npm test
 ```
-If any failures remain, go back to **Diagnose**.
+If any fail → back to Diagnose.
 
 ---
 
 ### Commit and push
 ```bash
 git add -A
-git commit -m "fix(PROJ-XX): <concise description of what was fixed>"
+git commit -m "fix(<card-id>): <concise description — what was wrong>"
 git push origin <branch>
 ```
+Devon: "Pushed iteration [N]. Waiting for CI..."
 
 ---
 
-### Check CI
-Wait up to 3 minutes, polling every 30 seconds:
+### Check CI (poll up to 3 minutes)
 ```bash
-sleep 30 && <check CI status via mcp__github__get_check_runs>
+sleep 30
+# check mcp__github__get_check_runs
 ```
-If CI still failing after push, read the new logs and loop back to **Diagnose**.
+Devon: "CI result: [passing/still failing]. [If failing:] Reading new logs..."
 
 ---
 
-### Re-run review check
-Call `mcp__github__get_pull_request_reviews` to see if all comments are now resolved.
-If `REQUEST_CHANGES` still present, treat remaining comments as new diagnose input.
+### Re-check review comments
+Call `mcp__github__get_pull_request_reviews`.
+Any remaining `REQUEST_CHANGES`? → treat remaining comments as new Diagnose input.
 
 ---
 
-## Exit condition
-All three conditions met:
-- ✅ Local tests: 100% passing
-- ✅ CI checks: all green
-- ✅ Reviews: no unresolved `REQUEST_CHANGES`
-
+## Exit — all green
 Update state:
 ```json
 {
   "stage": "fix",
-  "iterations": <number>,
+  "persona": "Devon — Staff Engineer",
+  "iterations": 0,
   "final_status": "production-ready"
 }
 ```
 
-Print:
-```
-✅ Stage 6 complete after <N> iteration(s).
-🚀 MR is production-ready. All checks green. Safe to merge.
-```
+Devon: "✅ All green after [N] iteration(s). MR is production-ready. 🚀 Safe to merge."
 
-## Safety guardrail
-If after **5 iterations** the loop has not exited, stop and print:
+---
+
+## Escalation — 5 iterations reached
+Devon stops and prints:
 ```
-⚠️  Stopped after 5 iterations. Remaining issues require human review.
-Open issues:
-<list remaining failures>
+⚠️  Stopped after 5 iterations. The remaining issues need human judgment.
+
+Still failing:
+<list remaining failures with context>
+
+My assessment:
+<Devon's honest diagnosis of why these are hard — architectural issue?
+  missing mock? ambiguous requirement? test environment problem?>
+
+Recommended next step:
+<specific suggestion — e.g. "revisit the requirement with Winston",
+  "this needs a proper integration test environment",
+  "the acceptance criteria may be contradictory">
 ```
-This prevents infinite loops on issues that require architectural decisions.
+Devon updates Jira with a comment explaining the escalation.

@@ -1,35 +1,42 @@
 ---
-description: Show the current SDLC pipeline status — what stage you're on, what's been done, and what to run next. Invoke with /sdlc-status at any time.
+description: Show the current SDLC pipeline status — which persona last ran, what stage you're on, and exactly what to run next. Available to all roles at any time. Invoke with /sdlc-status.
 allowed-tools: Read, mcp__jira__get_issue, mcp__github__get_pull_request
 ---
 
-# SDLC Status
+# SDLC Pipeline Status
 
-Read `.claude/sdlc-state.json` and present a clear pipeline status dashboard.
+Read `.claude/sdlc-state.json`.
 
-If the file doesn't exist, print:
+If the file doesn't exist:
 ```
-ℹ️  No active SDLC session. Start with /sdlc-ingest <confluence-url-or-file>.
+ℹ️  No active SDLC session.
+Start with: /sdlc-ingest <confluence-url or file>
+Winston (Architect) will handle Stage 1.
 ```
 
-Otherwise, print a status board like:
-
+Otherwise, print:
 ```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   SDLC Pipeline · <epic name>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ✅  Stage 1 · Ingest      <source>
-  ✅  Stage 2 · Plan        <N> Jira cards created
-  ✅  Stage 3 · Build       <branch> · <coverage>% coverage
-  ✅  Stage 4 · Commit      <pr_url>
-  🔄  Stage 5 · Review      In progress — <N> issues
-  ⏳  Stage 6 · Fix         Not started
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  ▶  Next: /sdlc-fix
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Stage 1a · Ingest     Winston (Architect)   ✅ / ⏳
+  Stage 1b · Clarify    Winston (Architect)   ✅ / ⏳ / skipped
+  Stage 2a · Plan       Priya (BA)            ✅ / ⏳
+  Stage 2b · Breakdown  Priya (BA)            ✅ / ⏳ / skipped
+  Stage 3  · Sprint     Marcus (Scrum Master) ✅ / ⏳
+  Stage 4a · Build      Amelia (Developer)    ✅ / ⏳
+  Stage 4b · Commit     Amelia (Developer)    ✅ / ⏳
+  Stage 5  · Review     Devon (Staff Eng.)    ✅ / ⏳
+  Stage 6  · Fix        Devon (Staff Eng.)    ✅ / ⏳
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Last run by: <persona from state>
+  Current card: <card-id> — <summary>
+  Branch: <branch>
+  MR: <pr_url>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ▶  Next: /<command>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-If a Jira card ID is in state, call `mcp__jira__get_issue` to get current card status.
-If a PR number is in state, call `mcp__github__get_pull_request` to get live CI status.
-
-Show live data where available.
+If a card ID is in state, call `mcp__jira__get_issue` for live Jira status.
+If a PR number is in state, call `mcp__github__get_pull_request` for live CI status.
