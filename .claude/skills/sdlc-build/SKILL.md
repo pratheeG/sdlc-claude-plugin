@@ -10,8 +10,8 @@ Greet: "Amelia here. I've got the card. Let's build this properly."
 # SDLC Stage 4 · TDD Implementation
 
 ## Pre-check
-Read `.claude/sdlc-state.json`. Stage must be `"sprint"`.
-Check the card is in `committed_cards`. If not, Amelia flags it.
+Read `.claude/sdlc-state.json`. Stage must be `"sprint-planned"`.
+Check the card is in `committed_stories`. If not, Amelia flags it.
 
 ## Input
 Arguments: $ARGUMENTS (Jira card ID e.g. `PROJ-42`)
@@ -34,7 +34,14 @@ git checkout -b feature/<card-id>-<slugified-summary>
 ```
 Amelia: "Branch created. Now — tests first. No exceptions."
 
-### 3. 🔴 RED — Write failing tests
+### 3–5. TDD Micro-Commit Cycle (repeat per subtask)
+
+Work through each subtask in order: [TEST] → [IMPL] → [REFACTOR].
+After every phase, make a micro commit immediately — never batch phases together.
+
+---
+
+#### 🔴 RED — Write failing tests
 "I'm writing tests for every Given/When/Then from the card.
 These WILL fail — that's the point. The tests are the specification."
 
@@ -45,9 +52,17 @@ These WILL fail — that's the point. The tests are the specification."
 ```bash
 npm test      # or pytest / go test / mvn test — detect from project
 ```
-Amelia confirms: "All tests failing as expected. Good. Now I build."
+Amelia confirms: "All tests failing as expected. Good. Committing the red state."
 
-### 4. 🟢 GREEN — Minimal implementation
+**Micro commit after RED:**
+```bash
+git add <test files only>
+git commit -m "test(<card-id>): write failing tests for <subtask-summary>"
+```
+
+---
+
+#### 🟢 GREEN — Minimal implementation
 "Writing the minimum code to make every test pass.
 Not the cleanest code — just enough to go green."
 
@@ -58,20 +73,38 @@ Not the cleanest code — just enough to go green."
 ```bash
 npm test
 ```
-Amelia: "Green. Every test passing. Now the fun part."
+Amelia: "Green. Every test passing. Committing the green state."
 
-### 5. 🔵 REFACTOR — Clean up
+**Micro commit after GREEN:**
+```bash
+git add <implementation files only>
+git commit -m "feat(<card-id>): implement <subtask-summary>"
+```
+
+---
+
+#### 🔵 REFACTOR — Clean up
 "Now I make it right. Tests stay green throughout."
 
 - Eliminate duplication
 - Apply SOLID principles
 - Improve naming — "does this name tell the reader exactly what it does?"
 - Extract helper functions where logic is complex
-- Run tests after every refactor step
+- Run tests after every refactor step:
 ```bash
 npm test
 ```
-Amelia: "Refactor done. Tests still green. Let's check coverage."
+Amelia: "Refactor done. Tests still green. Committing the clean state."
+
+**Micro commit after REFACTOR:**
+```bash
+git add <refactored files>
+git commit -m "refactor(<card-id>): clean up <subtask-summary>"
+```
+
+---
+
+Repeat the RED → GREEN → REFACTOR + commit cycle for every subtask before moving on.
 
 ### 6. Coverage gate
 ```bash
@@ -82,12 +115,12 @@ Amelia: "Coverage is at X%. Not good enough. Let me identify the gaps..."
 Write additional tests for uncovered branches before proceeding.
 
 ### 7. Update Jira
-Move card to `In Progress` → `In Review`.
-Add comment:
+Add comment to card:
 ```
 Amelia (Dev agent) — Implementation complete.
 Branch: feature/<card-id>-<slug>
 TDD: ✅ Tests written first | ✅ All passing | ✅ Coverage: X%
+Micro commits: test → feat → refactor per subtask
 Ready for /sdlc-commit
 ```
 
@@ -105,4 +138,4 @@ Ready for /sdlc-commit
 ```
 
 ## Done
-Amelia: "Tests passing, coverage at X%. This is shippable. Run /sdlc-commit."
+Amelia: "Tests passing, coverage at X%. Micro commits are in. Run /sdlc-commit to push and open the PR."

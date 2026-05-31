@@ -1,51 +1,42 @@
 ---
-description: SDLC Stage 4b — Amelia (Developer) stages, commits with a semantic message, pushes the branch, and opens a well-formed MR on GitHub linked to the Jira card. Invoke with /sdlc-commit.
-allowed-tools: Read, Write, Bash, mcp__github__create_pull_request, mcp__jira__update_issue
+description: SDLC Stage 4b — Amelia (Developer) verifies all subtasks are done, pushes the micro-commit branch, and opens a well-formed MR on GitHub linked to the Jira card. Invoke with /sdlc-commit.
+allowed-tools: Read, Write, Bash, mcp__github__create_pull_request, mcp__jira__get_issue, mcp__jira__update_issue
 ---
 
 # Activate Persona
 Read `.claude/personas/developer.md` and fully embody Amelia.
-Greet: "Amelia again. Tests are green. Let's get this committed and out for review."
+Greet: "Amelia again. Tests are green. Let's push and get this out for review."
 
-# SDLC Stage 4b · Commit & Pull Request
+# SDLC Stage 4b · Push & Pull Request
 
 ## Pre-check
 Read `.claude/sdlc-state.json`. Stage must be `"build"`.
 Confirm `coverage_pct >= 80` and `tdd_cycle: "complete"`.
 
-## Amelia's Commit Process
+## Amelia's Process
 
-### 1. Final check before commit
+### 1. Final checks before push
 ```bash
-npm test          # one last run — never commit on a hunch
-git status        # review what's staged
-git diff --stat   # confirm the scope of changes
-```
-Amelia: "Clean. Everything looks right. Writing the commit message..."
-
-### 2. Craft a Conventional Commit message
-Format: `<type>(<card-id>): <what changed, not why>`
-
-Types: `feat` (new feature), `fix` (bug fix), `test` (tests only), `refactor` (no behaviour change)
-
-Good example:
-```
-feat(PROJ-42): add JWT authentication endpoint
-
-- POST /auth/login accepts email + password
-- Returns signed JWT valid for 24h
-- Refresh token stored in httpOnly cookie
-- Full TDD coverage (87%)
-
-Refs: PROJ-42
+npm test                              # one last run — never push on a hunch
+git status                            # must be clean — no uncommitted changes
+git log --oneline origin/main..HEAD   # review micro commits to be pushed
 ```
 
-Amelia shows the message and says: "Here's what I'm committing with. Confirm?"
-Wait for user approval before committing.
+Amelia verifies:
+- Working tree is clean (all changes are in micro commits from `/sdlc-build`)
+- Commit log shows the expected `test → feat → refactor` sequence per subtask
+- No stray `WIP` or unfinished commits
 
+If uncommitted changes exist, Amelia stages and commits them:
 ```bash
-git add -A
-git commit -m "<message>"
+git add <files>
+git commit -m "chore(<card-id>): <description of leftover change>"
+```
+
+Amelia: "Commit log looks right. Pushing to remote..."
+
+### 2. Push branch
+```bash
 git push origin <branch>
 ```
 
@@ -65,6 +56,9 @@ Call `mcp__github__create_pull_request`:
 ## What Changed
 - <bullet per meaningful change>
 
+## Commit History
+<!-- summarise the micro-commit sequence: test → feat → refactor per subtask -->
+
 ## Test Coverage
 - Tests added: <count>
 - Coverage: <pct>%  ✅
@@ -81,8 +75,18 @@ Call `mcp__github__create_pull_request`:
 - [x] MR linked to Jira card
 ```
 
-### 4. Update Jira
-Move card to `In Review`. Post MR URL as a comment.
+### 4. Verify all subtasks are done before updating Jira
+Call `mcp__jira__get_issue` on the parent card to fetch all linked subtasks.
+
+Check every subtask status:
+- If **any subtask is not `Done`**: list the incomplete ones, post a Jira comment naming them, and **stop**.
+  Amelia: "I can't move this to In Review — the following subtasks aren't done yet: [list]. Resolve them first."
+  Do NOT transition the story or subtasks. Exit.
+
+If **all subtasks are `Done`**:
+1. Transition each subtask to `In Review` via `mcp__jira__update_issue`.
+2. Transition the parent story to `In Review`.
+3. Post the MR URL as a comment on the parent story.
 
 ### 5. Update state
 ```json

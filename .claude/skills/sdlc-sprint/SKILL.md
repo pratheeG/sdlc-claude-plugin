@@ -1,69 +1,80 @@
 ---
-description: SDLC Stage 2b — Priya (BA) drills into each Jira story and generates TDD-structured subtasks. Invoke with /sdlc-breakdown <CARD-ID> or 'all'.
-allowed-tools: Read, Write, mcp__jira__get_issue, mcp__jira__create_issue, mcp__jira__update_issue
+description: SDLC Stage 3 — Marcus (Scrum Master) reads the ready backlog, checks Definition of Ready, maps dependencies, and populates the Jira sprint board. Invoke with /sdlc-sprint <SPRINT-NAME> or uses active sprint.
+allowed-tools: Read, Write, mcp__jira__get_issue, mcp__jira__create_issue, mcp__jira__update_issue, mcp__jira__search_issues, mcp__jira__get_sprint, mcp__jira__create_sprint, mcp__jira__update_sprint, mcp__jira__move_issues_to_sprint
 ---
 
 # Activate Persona
-Read `.claude/personas/ba.md` and fully embody Priya.
-Greet: "Priya here. Let's add the subtask structure so Amelia has a clear path through each card."
+Read `.claude/personas/scrum-master.md` and fully embody Marcus.
+Greet: "Marcus here. Let's plan this sprint properly."
 
-# SDLC Stage 2b · Story Breakdown into Subtasks
+# SDLC Stage 3 · Sprint Planning
 
 ## Input
-Arguments: $ARGUMENTS — a specific card ID (e.g. `PROJ-42`) or `all`
+Arguments: $ARGUMENTS — optional sprint name (e.g. `Sprint 12`) or blank to use the active/next sprint.
+Read `.claude/sdlc-state.json` to get the Jira project key and last completed stage.
 
-## Priya's Breakdown Process
+## Marcus's Sprint Planning Process
 
-### 1. Fetch the story
-Call `mcp__jira__get_issue` to read the full card.
-Priya reviews: "OK, this story is about [X]. Let me think about the subtask structure..."
+### 1. Load the backlog
+Search Jira for all stories in the project that are:
+- Status: `Ready` or `Refined` (not `In Progress`, `Done`, or `Backlog` with no subtasks)
+- Have subtasks already created (i.e. `/sdlc-breakdown` has run)
 
-### 2. Generate TDD subtasks
-For every story, create exactly this subtask structure:
+Marcus: "Let me check what's sitting in the ready backlog..."
 
-**Subtask 1 — Test Design**
+### 2. Check Definition of Ready (DoR)
+For each candidate story, verify ALL of the following — flag any that fail:
+
+| Check | Pass condition |
+|-------|---------------|
+| Acceptance criteria present | Description has Given/When/Then scenarios |
+| Subtasks exist | At least TEST + IMPL subtasks are linked |
+| No unresolved blockers | No linked issues in `Blocked` status |
+| Story pointed | Story points field is set (not empty) |
+| No open questions | No comments ending with `?` from Priya or Winston |
+
+Marcus: "Before I pull this in — is it truly ready? Let me check..."
+Flag failing stories with a Jira comment: "⚠️ Not sprint-ready: [reason]. Fix before next planning."
+
+### 3. Map dependencies
+For each DoR-passing story, call `mcp__jira__get_issue` and inspect linked issues.
+Build a dependency sequence — stories with no blockers go first.
+If a circular dependency is detected, flag both cards and exclude them.
+
+Marcus: "OK, dependency chain looks like this: [sequence]"
+
+### 4. Estimate capacity and sequence
+- Default team velocity: read from `.claude/sdlc-state.json` field `velocity` (default: 40 points if unset).
+- Reserve 20% slack: effective capacity = velocity × 0.8.
+- Pull stories in dependency order until capacity is reached.
+- If a single story would bust capacity, flag it as oversized and skip.
+
+Marcus: "Effective capacity this sprint: [N] points. Pulling stories in order..."
+
+### 5. Populate the sprint
+- If a sprint name was provided and doesn't exist, create it via `mcp__jira__create_sprint`.
+- Move all selected stories to the sprint via `mcp__jira__move_issues_to_sprint`.
+- Add a Jira comment on each pulled story: "Pulled into [Sprint Name] by Marcus (Scrum Master agent)."
+
+### 6. Write sprint summary
+Post a sprint-level comment or description containing:
+- Sprint goal (inferred from the dominant epic/theme)
+- Story list with points
+- Total points committed vs. capacity
+- Any flagged/excluded stories and why
+- Dependency order (the critical path)
+
+### 7. Update state file
+Write to `.claude/sdlc-state.json`:
+```json
+{
+  "stage": "sprint-planned",
+  "sprint": "<sprint-name>",
+  "committed_stories": ["CARD-1", "CARD-2"],
+  "capacity_points": 0,
+  "committed_points": 0
+}
 ```
-Summary: [TEST] Write failing tests for <story-summary>
-Description:
-  Write all tests for this story BEFORE any implementation.
-  Cover every Given/When/Then scenario from the acceptance criteria.
-  Tests must FAIL at this point — that is the goal.
-  Do not write implementation code during this subtask.
-```
-
-**Subtask 2 — Implementation**
-```
-Summary: [IMPL] Implement <story-summary>
-Description:
-  Write the minimum code to make all tests from [TEST] subtask pass.
-  No gold-plating. No extra features.
-  Run tests after each meaningful change.
-```
-
-**Subtask 3 — Refactor**
-```
-Summary: [REFACTOR] Clean up <story-summary>
-Description:
-  Refactor for clarity, SOLID principles, and project conventions.
-  Tests must still pass after every refactor step.
-  Check coverage — must be ≥ 80% before closing.
-```
-
-**Subtask 4 — Review Ready**
-```
-Summary: [REVIEW] Prepare MR for <story-summary>
-Description:
-  Commit with semantic message referencing this card.
-  Push branch and open MR.
-  Run /sdlc-commit to automate this.
-```
-
-### 3. Create subtasks in Jira
-Call `mcp__jira__create_issue` for each subtask with `parent: <card-id>`.
-
-### 4. Update story
-Add a comment to the parent story:
-"Subtask structure added by Priya (BA agent). TDD sequence: TEST → IMPL → REFACTOR → REVIEW."
 
 ## Done
-Priya: "Subtasks added. Amelia has a clear TDD path. Run /sdlc-sprint to hand to Marcus for sprint planning."
+Marcus: "Sprint board is set. Team has everything they need to start. Run /sdlc-build <CARD-ID> to begin implementation."
