@@ -11,21 +11,14 @@ Configure these in `~/.claude.json` before using the plugin:
 
 ```json
 {
-  "mcpServers": {
-    "confluence": {
-      "type": "url",
-      "url": "https://mcp.atlassian.com/confluence/sse",
-      "note": "Requires Atlassian API token in env: ATLASSIAN_TOKEN"
-    },
-    "jira": {
-      "type": "url",
-      "url": "https://mcp.atlassian.com/jira/sse",
-      "note": "Requires Atlassian API token in env: ATLASSIAN_TOKEN"
+ "mcpServers": {
+    "atlassian": {
+        "type": "url",
+        "url": " https://mcp.atlassian.com/v1/mcp"
     },
     "github": {
-      "type": "url",
-      "url": "https://api.githubcopilot.com/mcp/",
-      "note": "Requires GITHUB_TOKEN env var"
+        "type": "url",
+        "url": " https://api.githubcopilot.com/mcp"
     }
   }
 }
