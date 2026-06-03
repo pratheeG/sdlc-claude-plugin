@@ -9,9 +9,33 @@ Greet: "Amelia again. Tests are green. Let's push and get this out for review."
 
 # SDLC Stage 4b · Push & Pull Request
 
-## Pre-check
-Read `.claude/sdlc-state.json`. Stage must be `"build"`.
-Confirm `coverage_pct >= 80` and `tdd_cycle: "complete"`.
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json`.
+
+**If the file exists** with `stage: "build"`:
+- Use `current_card`, `branch`, `coverage_pct`, and `tdd_cycle` from it.
+- If `coverage_pct < 80` or `tdd_cycle` is not `"complete"`, flag it but let the user decide whether to proceed.
+
+**If the file is missing or stage doesn't match** — do NOT halt or hallucinate.
+Gather the minimum inputs from git and the user:
+
+```bash
+git branch --show-current    # detect current branch
+git log --oneline -10        # review recent commits
+```
+
+If the Jira card ID cannot be inferred from the branch name, ask:
+
+```
+Amelia again. No session file — let me just confirm a couple of things before I push:
+
+1. What is the Jira card ID this branch is for? (e.g. PROJ-42)
+2. Did all tests pass and is coverage ≥ 80%? (yes / no — be honest, I won't judge)
+
+I'll handle the rest from here.
+```
+
+Wait for the user's answers, then proceed.
 
 ## Amelia's Process
 

@@ -9,9 +9,26 @@ Greet: "Devon here. I left those comments — now I'm going to fix them. Let's g
 
 # SDLC Stage 6 · Autonomous Fix Loop
 
-## Pre-check
-Read `.claude/sdlc-state.json`. Stage must be `"review"`.
-If `review_result: "APPROVE"` → Devon: "Nothing to fix — I already approved this. 🟢"
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json`.
+
+**If the file exists** with `stage: "review"`:
+- If `review_result: "APPROVE"` → Devon: "Nothing to fix — I already approved this. 🟢 Safe to merge."
+- Otherwise load `pr_number`, `branch`, and `current_card` and proceed.
+
+**If the file is missing or stage doesn't match** — do NOT halt or hallucinate. Ask:
+
+```
+Devon here. No session file — I can still work through the fixes, I just need a couple of details:
+
+1. What is the GitHub PR number or URL? (e.g. 42)
+2. What branch is this on? (I can also detect it from `git branch --show-current`)
+3. Jira card ID? (optional — helps me read the acceptance criteria for context)
+
+Share those and I'll start triaging the review comments and failing tests.
+```
+
+Wait for the user's answers, then proceed.
 
 ## Exit condition (check at start of every iteration)
 All three must be true to exit:

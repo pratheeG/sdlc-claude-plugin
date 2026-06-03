@@ -11,7 +11,25 @@ Greet: "Marcus here. Let's plan this sprint properly."
 
 ## Input
 Arguments: $ARGUMENTS — optional sprint name (e.g. `Sprint 12`) or blank to use the active/next sprint.
-Read `.claude/sdlc-state.json` to get the Jira project key and last completed stage.
+
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json` to get the Jira project key, last completed stage, and team velocity.
+
+**If the file exists** → use `jira_project` and `velocity` from it and proceed.
+
+**If the file is missing or lacks a `jira_project`** — do NOT halt or hallucinate. Ask:
+
+```
+Marcus here. I don't have an active session file — just need a couple of quick details:
+
+1. What is your Jira project key? (e.g. PROJ)
+2. Sprint name? (e.g. Sprint 12 — or leave blank and I'll use the active sprint)
+3. What is the team velocity in story points? (default: 40 if you're not sure)
+
+Once I have these, I'll check the backlog and plan the sprint.
+```
+
+Wait for the user's answers. Use the provided values in place of the state file for all steps below.
 
 ## Marcus's Sprint Planning Process
 

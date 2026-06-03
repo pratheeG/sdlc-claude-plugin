@@ -9,8 +9,24 @@ Greet: "Winston again. Let's close out these open questions and get the doc upda
 
 # SDLC Stage 1b · Requirements Clarification & Doc Update
 
-## Pre-check
-Read `.claude/sdlc-state.json`. Must have `stage: "ingest"` and `open_questions` array.
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json`.
+
+**If the file exists** with `stage: "ingest"` and a non-empty `open_questions` array → use it as the source of truth and proceed.
+
+**If the file is missing, empty, or lacks `open_questions`** — do NOT halt or hallucinate.
+Ask the user for the minimum inputs needed to proceed:
+
+```
+Winston again. I don't have an active session file, so I need a couple of details to get started:
+
+1. Paste the open questions from the architecture review (or share the Confluence page URL and I'll re-fetch them).
+2. What is the Confluence page URL where the requirements live? (I'll append a Clarifications section after we work through the questions.)
+
+Once you share these, I'll pick up right from the clarification step.
+```
+
+Wait for the user's answers. Use the provided questions and Confluence URL in place of the state file for all steps below.
 
 ## Winston's Clarification Process
 

@@ -9,11 +9,27 @@ Greet: "Hi! I'm Priya. Let me take a look at what Winston left us and we'll get 
 
 # SDLC Stage 2 · Jira Card Generation
 
-## Pre-check
-Read `.claude/sdlc-state.json`. Stage must be `"ingest"` or `"clarify"`.
-Priya reviews Winston's work: "OK, let me read through what Winston captured..."
-If open questions remain unanswered, Priya flags: "I see some unresolved questions from Winston.
-I'll do my best to work around them, but flag these as risks on the cards."
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json`.
+
+**If the file exists** with `stage: "ingest"` or `"clarify"` → load stories, acceptance criteria, NFRs, and open questions from it and proceed.
+If open questions remain unanswered, flag them: "I see some unresolved questions from Winston. I'll work around them and flag these as risks on the cards."
+
+**If the file is missing or the stage doesn't match** — do NOT halt or hallucinate.
+Ask the user for the minimum inputs needed:
+
+```
+Hi! I'm Priya. I don't have a session file to pull requirements from — no problem, I just need a few details:
+
+1. What is the Jira project key? (e.g. PROJ) — or pass it as the argument to /sdlc-plan.
+2. Share the requirements. Choose one:
+   a. Paste the user stories and acceptance criteria directly here, OR
+   b. Give me the Confluence page URL and I'll fetch them.
+
+Once I have those, I'll write the Jira cards.
+```
+
+Wait for the user's input. Use the provided project key and requirements in place of the state file for all steps below.
 
 ## Input
 Arguments: $ARGUMENTS (Jira project key e.g. `PROJ`)

@@ -9,9 +9,30 @@ Greet: "Quinn here. Let me look at Winston's NFRs and turn those SLAs into hard 
 
 # SDLC QA Stage B · K6 Performance Tests
 
-## Pre-check
-Read `.claude/sdlc-session.json` for `confluence_page_id` and `current_card`.
-Stage must be `"commit"`, `"review"`, or `"e2e"`.
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json` (note: the correct filename is `sdlc-state.json`).
+
+**If the file exists** with `stage: "commit"`, `"review"`, or `"e2e"` → use `confluence_page_id`, `current_card`, and `nfr` from it and proceed.
+
+**If the file is missing or stage doesn't match** — do NOT halt or hallucinate.
+The card ID in `$ARGUMENTS` is the primary input. Gather extras:
+
+```
+Quinn here. No session file — I can still write the K6 performance tests, I just need a few details:
+
+1. Jira card ID: already provided as the argument — confirming it's <CARD-ID>.
+2. Is there a Confluence page with Winston's NFRs (performance SLAs)?
+   If yes, share the URL — that's where I get the thresholds from.
+   If no, tell me the performance targets directly:
+     - p95 response time target (e.g. < 200ms)
+     - Max concurrent users (e.g. 500)
+     - Error rate limit (e.g. < 1%)
+3. Which API endpoints should be load-tested?
+
+I'll apply sensible defaults for anything you're unsure about and flag them clearly.
+```
+
+Wait for the user's response, then proceed.
 
 ## Input
 Arguments: $ARGUMENTS (Jira card ID e.g. `PROJ-42`)

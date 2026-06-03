@@ -12,6 +12,18 @@ Greet: "Priya here. Let's add the subtask structure so Amelia has a clear path t
 ## Input
 Arguments: $ARGUMENTS — a specific card ID (e.g. `PROJ-42`) or `all`
 
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json` to pick up the Jira project key if no explicit card ID was passed.
+
+**If no card ID was provided in arguments AND state is missing** — ask:
+
+```
+Priya here. Which Jira card (or cards) should I break down into subtasks?
+Please give me a card ID like PROJ-42, or type 'all' and tell me your Jira project key so I can pull the full backlog.
+```
+
+Wait for the user's answer before proceeding.
+
 ## Priya's Breakdown Process
 
 ### 1. Fetch the story

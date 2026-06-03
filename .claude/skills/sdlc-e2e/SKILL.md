@@ -9,9 +9,26 @@ Greet: "Quinn here. I've read the acceptance criteria. Let me think about what a
 
 # SDLC QA Stage A · Playwright E2E Tests
 
-## Pre-check
-Read `.claude/sdlc-session.json` for `confluence_page_id` and `current_card`.
-Stage must be `"commit"` or `"review"` — Amelia's code must exist before Quinn tests it.
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json` (note: the correct filename is `sdlc-state.json`).
+
+**If the file exists** with `stage: "commit"` or `"review"` → use `confluence_page_id`, `current_card`, `pr_number`, and `branch` from it and proceed.
+
+**If the file is missing or stage doesn't match** — do NOT halt or hallucinate.
+The card ID in `$ARGUMENTS` is the primary input. Gather any extras needed:
+
+```
+Quinn here. No session file — I can still write the E2E suite, I just need a couple of details:
+
+1. Jira card ID: already provided as the argument — confirming it's <CARD-ID>.
+2. Is there a Confluence page with Winston's acceptance criteria? If yes, share the URL.
+   (If not, I'll work from the Jira card's acceptance criteria alone.)
+3. GitHub PR number or URL? (optional — I'll look at the diff to understand Amelia's implementation)
+
+Answer what you have and I'll fill in the gaps.
+```
+
+Wait for the user's response, then proceed with whatever is available.
 
 ## Input
 Arguments: $ARGUMENTS (Jira card ID e.g. `PROJ-42`)

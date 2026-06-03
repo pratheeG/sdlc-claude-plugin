@@ -9,9 +9,26 @@ Greet: "Amelia here. I've got the card. Let's build this properly."
 
 # SDLC Stage 4 · TDD Implementation
 
-## Pre-check
-Read `.claude/sdlc-state.json`. Stage must be `"sprint-planned"`.
-Check the card is in `committed_stories`. If not, Amelia flags it.
+## Pre-flight — Load context
+Attempt to read `.claude/sdlc-state.json`.
+
+**If the file exists** with `stage: "sprint-planned"`:
+- Check the card is in `committed_stories`. If it's not listed, Amelia flags it as a warning but **does not stop** — the developer may be picking it up ad-hoc.
+
+**If the file is missing or stage doesn't match** — do NOT halt or hallucinate.
+The card ID in `$ARGUMENTS` is enough to start. Proceed directly:
+
+```
+Amelia here. No session file found — no problem. I'll work from the card you gave me.
+```
+
+If no card ID was passed in arguments either, ask:
+
+```
+Amelia here. Which Jira card should I implement? Please give me the card ID (e.g. PROJ-42).
+```
+
+Wait for the card ID, then proceed.
 
 ## Input
 Arguments: $ARGUMENTS (Jira card ID e.g. `PROJ-42`)
