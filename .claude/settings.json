@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"c:\\\\Users\\\\prems\\\\Documents\\\\Work\\\\claude\\\\sdlc-claude-plugin\\\\.claude\\\\agents\" \"c:\\\\Users\\\\prems\\\\Documents\\\\Work\\\\claude\\\\sdlc-claude-plugin\\\\.claude\\\\skills\\\\sdlc\")",
+      "Edit(/.claude/skills/sdlc/**)",
+      "Bash(rm -rf \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-ingest\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-clarify\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-plan\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-breakdown\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-sprint\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-build\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-commit\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-e2e\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-perf\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-review\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-fix\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-status\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/skills/sdlc-test\" \"c:/Users/prems/Documents/Work/claude/sdlc-claude-plugin/.claude/personas\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\prems\\Documents\\Work\\claude\\sdlc-claude-plugin\\.claude",
+      "c:\\Users\\prems\\Documents\\Work\\claude\\sdlc-claude-plugin\\.claude\\skills\\sdlc-ingest"
+    ]
+  }
+}

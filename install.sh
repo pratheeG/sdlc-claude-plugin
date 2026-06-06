@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  SDLC Plugin Installer
-#  Usage: bash install.sh
-#  Copies skills into your project's .claude/ directory.
+#  Usage: bash install.sh [target-directory]
+#  Copies agents, orchestrator skill, and CLAUDE.md into
+#  your project's .claude/ directory.
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 set -euo pipefail
@@ -10,10 +11,17 @@ set -euo pipefail
 PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${1:-.}"   # default: current directory
 
-SKILLS_SRC="$PLUGIN_DIR/.claude/skills"
-SKILLS_DST="$TARGET_DIR/.claude/skills"
+AGENTS_SRC="$PLUGIN_DIR/.claude/agents"
+AGENTS_DST="$TARGET_DIR/.claude/agents"
+
+SKILL_SRC="$PLUGIN_DIR/.claude/skills/sdlc"
+SKILL_DST="$TARGET_DIR/.claude/skills/sdlc"
+
 CLAUDE_MD_SRC="$PLUGIN_DIR/CLAUDE.md"
 CLAUDE_MD_DST="$TARGET_DIR/CLAUDE.md"
+
+MCP_JSON_SRC="$PLUGIN_DIR/.mcp.json"
+MCP_JSON_DST="$TARGET_DIR/.mcp.json"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -23,22 +31,33 @@ echo ""
 echo "Installing into: $TARGET_DIR"
 echo ""
 
-# 1. Copy skills
-mkdir -p "$SKILLS_DST"
-for skill_dir in "$SKILLS_SRC"/*/; do
-  skill_name=$(basename "$skill_dir")
-  dest="$SKILLS_DST/$skill_name"
-  if [ -d "$dest" ]; then
-    echo "  ↻  Updating skill: $skill_name"
+# ── 1. Copy sub-agents ────────────────────────────────────
+echo "  Installing persona agents..."
+mkdir -p "$AGENTS_DST"
+for agent_file in "$AGENTS_SRC"/*.md; do
+  agent_name=$(basename "$agent_file")
+  if [ -f "$AGENTS_DST/$agent_name" ]; then
+    echo "  ↻  Updating agent: $agent_name"
   else
-    echo "  +  Installing skill: $skill_name"
+    echo "  +  Installing agent: $agent_name"
   fi
-  cp -r "$skill_dir" "$SKILLS_DST/"
+  cp "$agent_file" "$AGENTS_DST/"
 done
 
-# 2. Copy or merge CLAUDE.md
+# ── 2. Copy orchestrator skill ───────────────────────────
+echo ""
+echo "  Installing orchestrator skill..."
+mkdir -p "$SKILL_DST"
+if [ -f "$SKILL_DST/SKILL.md" ]; then
+  echo "  ↻  Updating skill: sdlc"
+else
+  echo "  +  Installing skill: sdlc"
+fi
+cp "$SKILL_SRC/SKILL.md" "$SKILL_DST/"
+
+# ── 3. Copy or merge CLAUDE.md ───────────────────────────
+echo ""
 if [ -f "$CLAUDE_MD_DST" ]; then
-  echo ""
   echo "  ⚠  CLAUDE.md already exists. Appending SDLC section..."
   echo "" >> "$CLAUDE_MD_DST"
   echo "---" >> "$CLAUDE_MD_DST"
@@ -49,7 +68,15 @@ else
   echo "  +  CLAUDE.md created"
 fi
 
-# 3. Gitignore state file (contains session data, not for commit)
+# ── 4. Copy .mcp.json if not present ─────────────────────
+if [ ! -f "$MCP_JSON_DST" ]; then
+  cp "$MCP_JSON_SRC" "$MCP_JSON_DST"
+  echo "  +  .mcp.json created (add your Atlassian + GitHub credentials)"
+else
+  echo "  ✓  .mcp.json already exists — skipping"
+fi
+
+# ── 5. Gitignore state file ───────────────────────────────
 GITIGNORE="$TARGET_DIR/.gitignore"
 if [ -f "$GITIGNORE" ]; then
   if ! grep -q "sdlc-state.json" "$GITIGNORE"; then
@@ -58,34 +85,46 @@ if [ -f "$GITIGNORE" ]; then
   fi
 fi
 
-# 4. Check MCP config
-MCP_JSON="$HOME/.mcp.json"
+# ── 6. Check MCP config ───────────────────────────────────
 echo ""
-if [ -f "$MCP_JSON" ]; then
-  if grep -q "confluence" "$MCP_JSON" && grep -q "jira" "$MCP_JSON" && grep -q "github" "$MCP_JSON"; then
-    echo "  ✅  MCP servers detected in ~/.mcp.json"
-  else
-    echo "  ⚠️   MCP servers NOT fully configured in ~/.mcp.json"
-    echo "      Add confluence, jira, and github MCP entries."
-    echo "      See CLAUDE.md for the required config snippet."
+mcp_ok=false
+for mcp_file in "$MCP_JSON_DST" "$HOME/.mcp.json"; do
+  if [ -f "$mcp_file" ] && grep -q "atlassian" "$mcp_file" && grep -q "github" "$mcp_file"; then
+    echo "  ✅  MCP servers detected in $mcp_file"
+    mcp_ok=true
+    break
   fi
-else
-  echo "  ⚠️   ~/.mcp.json not found."
-  echo "      Create it with MCP server config before using the plugin."
+done
+if [ "$mcp_ok" = false ]; then
+  echo "  ⚠️   Atlassian + GitHub MCP servers not configured."
+  echo "      Edit .mcp.json and add your credentials."
   echo "      See CLAUDE.md for the required config snippet."
 fi
 
+# ── 7. Summary ────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  ✅  Installation complete!"
 echo ""
-echo "  Available commands in Claude Code:"
-echo "    /sdlc-ingest  <confluence-url or file>"
-echo "    /sdlc-plan    <jira-project-key>"
-echo "    /sdlc-build   <JIRA-CARD-ID>"
-echo "    /sdlc-commit"
-echo "    /sdlc-review"
-echo "    /sdlc-fix"
-echo "    /sdlc-status"
+echo "  Agents installed (.claude/agents/):"
+echo "    sdlc-winston  Winston  · ingest, clarify"
+echo "    sdlc-priya    Priya    · plan, breakdown"
+echo "    sdlc-marcus   Marcus   · sprint"
+echo "    sdlc-amelia   Amelia   · build, commit"
+echo "    sdlc-quinn    Quinn    · e2e, perf"
+echo "    sdlc-devon    Devon    · review, fix"
+echo ""
+echo "  Usage — one command for everything:"
+echo "    /sdlc <stage> [args]"
+echo ""
+echo "  Examples:"
+echo "    /sdlc ingest  <confluence-url or file>"
+echo "    /sdlc plan    <JIRA-PROJECT-KEY>"
+echo "    /sdlc build   <CARD-ID>"
+echo "    /sdlc review"
+echo "    /sdlc status"
+echo ""
+echo "  Full auto-run (stages 1 → sprint):"
+echo "    /sdlc pipeline <confluence-url> <JIRA-PROJECT-KEY>"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""

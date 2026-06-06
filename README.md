@@ -1,8 +1,26 @@
 # SDLC Automation Plugin for Claude Code
 
-A reusable Claude Code plugin that automates the full SDLC — from reading requirements to a production-ready MR — using slash commands driven by AI personas.
+A reusable Claude Code plugin that automates the full SDLC — from reading requirements to a production-ready PR — using a single orchestrator command that delegates to specialised AI persona agents.
 
-## Quick Start (for each team member)
+## How it works
+
+```
+/sdlc <stage> [args]
+       │
+       ▼
+  Orchestrator  ──routes to──►  sdlc-winston   (Solution Architect)
+                                sdlc-priya     (Business Analyst)
+                                sdlc-marcus    (Scrum Master)
+                                sdlc-amelia    (Senior Developer)
+                                sdlc-quinn     (QA Engineer)
+                                sdlc-devon     (Staff Engineer)
+```
+
+Each agent runs in an isolated context with only the tools it needs, writes its results to a shared state file, and hands off cleanly to the next stage.
+
+---
+
+## Quick Start
 
 ### 1. Clone this plugin repo
 ```bash
@@ -15,18 +33,26 @@ cd /path/to/your-project
 bash /path/to/sdlc-claude-plugin/install.sh
 ```
 
-### 3. Configure MCP servers in `~/.mcp.json`
+This copies:
+- `.claude/agents/` — 6 persona sub-agents
+- `.claude/skills/sdlc/` — the orchestrator slash command
+- `CLAUDE.md` — project conventions
+- `.mcp.json` — MCP server config template
+
+### 3. Configure MCP credentials
+
+Edit `.mcp.json` in your project (or `~/.mcp.json` globally):
 ```json
 {
   "mcpServers": {
-      "atlassian": {
-          "type": "url",
-          "url": " https://mcp.atlassian.com/v1/mcp"
-      },
-      "github": {
-          "type": "url",
-          "url": " https://api.githubcopilot.com/mcp"
-      }
+    "atlassian": {
+      "type": "url",
+      "url": "https://mcp.atlassian.com/v1/mcp"
+    },
+    "github": {
+      "type": "url",
+      "url": "https://api.githubcopilot.com/mcp"
+    }
   }
 }
 ```
@@ -39,93 +65,54 @@ export GITHUB_TOKEN=your_github_pat
 
 ---
 
-## Personas
+## Usage
 
-Each stage is driven by a named AI persona. Persona definitions live in `.claude/personas/`.
+One command for everything:
 
-| Persona | Role | Stages |
-|---------|------|--------|
-| Winston | Solution Architect | Ingest, Clarify |
-| Priya | Business Analyst | Plan, Breakdown |
-| Marcus | Scrum Master | Sprint planning |
-| Amelia | Senior Developer | Build, Commit |
-| Quinn | QA Engineer | E2E tests, Performance tests |
-| Devon | Staff Engineer | Review, Fix |
+```
+/sdlc <stage> [args]
+```
+
+### Full pipeline reference
+
+| Stage       | Command                              | Agent   | What it does                                              |
+|-------------|--------------------------------------|---------|-----------------------------------------------------------|
+| 1 · Ingest  | `/sdlc ingest <confluence-url\|file>`| Winston | Read requirements, extract structure, surface questions   |
+| 1b · Clarify| `/sdlc clarify`                      | Winston | Apply answers, update Confluence doc                      |
+| 2 · Plan    | `/sdlc plan <PROJECT-KEY>`           | Priya   | Create Jira epics & stories with acceptance criteria      |
+| 2b · Break  | `/sdlc breakdown <CARD-ID\|all>`     | Priya   | Add TDD subtasks (TEST/IMPL/REFACTOR/REVIEW) to stories   |
+| 3 · Sprint  | `/sdlc sprint [sprint-name]`         | Marcus  | Check DoR, map dependencies, populate sprint board        |
+| 4 · Build   | `/sdlc build <CARD-ID>`              | Amelia  | TDD implementation — Red → Green → Refactor, 80% coverage |
+| 4b · Commit | `/sdlc commit`                       | Amelia  | Push branch, open GitHub PR linked to Jira card           |
+| QA-A · E2E  | `/sdlc e2e <CARD-ID>`               | Quinn   | Playwright E2E tests for every acceptance scenario        |
+| QA-B · Perf | `/sdlc perf <CARD-ID>`              | Quinn   | K6 load/stress/spike/soak tests from NFR SLAs             |
+| 5 · Review  | `/sdlc review`                       | Devon   | Three-lens code review, inline PR comments                |
+| 6 · Fix     | `/sdlc fix`                          | Devon   | Autonomous fix loop until all CI checks are green         |
+| — · Status  | `/sdlc status`                       | —       | Show pipeline dashboard and next command                  |
+
+### Auto-run stages 1–3
+
+```
+/sdlc pipeline <confluence-url> <JIRA-PROJECT-KEY>
+```
+
+Automatically chains: ingest → clarify → plan → breakdown → sprint.
+Pauses before build to let you choose which card to implement first.
 
 ---
 
-## Usage
+## Personas
 
-Open Claude Code in your project, then run commands in order:
+| Agent          | Persona | Expertise                          |
+|----------------|---------|------------------------------------|
+| `sdlc-winston` | Winston | Solution Architect, 20 yrs         |
+| `sdlc-priya`   | Priya   | Business Analyst, 12 yrs           |
+| `sdlc-marcus`  | Marcus  | Scrum Master / Agile Coach, 10 yrs |
+| `sdlc-amelia`  | Amelia  | Senior Developer, 8 yrs, TDD       |
+| `sdlc-quinn`   | Quinn   | QA Engineer, 10 yrs, Playwright+K6 |
+| `sdlc-devon`   | Devon   | Staff Engineer, 15 yrs, reviewer   |
 
-### Stage 1 · Requirements Ingestion
-```
-/sdlc-ingest <confluence-url or file>
-```
-Winston reads requirements, extracts structured criteria (stories, acceptance criteria, NFRs, integrations), and surfaces numbered clarifying questions before handing off.
-
-### Stage 1b · Clarification
-```
-/sdlc-clarify
-```
-Winston walks through each open question, gets your answers, and updates the Confluence page with a dated Clarifications section.
-
-### Stage 2 · Jira Card Generation
-```
-/sdlc-plan PROJ
-```
-Priya decomposes requirements into Jira epics and user stories with full acceptance criteria, story points (Fibonacci), and dependency ordering.
-
-### Stage 2b · Story Breakdown
-```
-/sdlc-breakdown PROJ-42
-/sdlc-breakdown all
-```
-Priya drills into each story and creates four TDD-structured subtasks: `[TEST]` → `[IMPL]` → `[REFACTOR]` → `[REVIEW]`.
-
-> `/sdlc-sprint` is an alias for `/sdlc-breakdown`.
-
-### Stage 4 · TDD Implementation
-```
-/sdlc-build PROJ-42
-```
-Amelia creates a feature branch and implements with strict TDD — Red (failing tests) → Green (minimal implementation) → Refactor. Enforces 80% coverage before proceeding.
-
-### Stage 4b · Commit & Pull Request
-```
-/sdlc-commit
-```
-Amelia runs a final test pass, writes a Conventional Commit message (requires your approval), pushes the branch, and opens a well-formed PR on GitHub linked to the Jira card.
-
-### Stage QA-A · Playwright E2E Tests
-```
-/sdlc-e2e PROJ-42
-```
-Quinn reads acceptance criteria from Confluence and Jira, scans Amelia's implementation for routes and components, then writes a full Playwright E2E suite using Page Object Model — covering happy paths, edge cases, error states, accessibility, and network resilience.
-
-### Stage QA-B · K6 Performance Tests
-```
-/sdlc-perf PROJ-42
-```
-Quinn reads Winston's NFRs and turns every performance SLA into a K6 load test with hard pass/fail thresholds. Covers load, stress, spike, and soak scenarios. Creates a Jira bug card if any threshold fails.
-
-### Stage 5 · Code Review
-```
-/sdlc-review
-```
-Devon reviews the PR diff through three lenses — correctness, maintainability, and security — runs tests locally, checks CI, and posts structured inline comments on GitHub (`🔴 Blocker` / `🟡 Warning` / `🔵 Suggestion`).
-
-### Stage 6 · Autonomous Fix
-```
-/sdlc-fix
-```
-Devon reads his own review comments and failing tests, applies targeted fixes, commits, pushes, and loops until all CI checks are green. Stops and escalates after 5 iterations if issues remain.
-
-### Any time · Pipeline Status
-```
-/sdlc-status
-```
-Shows the full stage pipeline, which persona last ran, current card/branch/MR, and exactly what to run next.
+Each agent is self-contained — persona, stage logic, and tool access in a single file.
 
 ---
 
@@ -133,50 +120,40 @@ Shows the full stage pipeline, which persona last ran, current card/branch/MR, a
 
 ```
 sdlc-claude-plugin/
-├── CLAUDE.md                              # Project constitution (copied to target project)
-├── install.sh                             # Team member setup script
+├── CLAUDE.md                     # Project constitution (copied to target project)
 ├── README.md
+├── install.sh                    # Setup script
+├── .mcp.json                     # MCP server config template
 └── .claude/
-    ├── personas/
-    │   ├── architect.md                   # Winston — Solution Architect
-    │   ├── ba.md                          # Priya — Business Analyst
-    │   ├── scrum-master.md                # Marcus — Scrum Master
-    │   ├── developer.md                   # Amelia — Senior Developer
-    │   ├── qa.md                          # Quinn — QA Engineer
-    │   └── reviewer.md                    # Devon — Staff Engineer
+    ├── agents/
+    │   ├── sdlc-winston.md       # Winston — ingest, clarify
+    │   ├── sdlc-priya.md         # Priya   — plan, breakdown
+    │   ├── sdlc-marcus.md        # Marcus  — sprint
+    │   ├── sdlc-amelia.md        # Amelia  — build, commit
+    │   ├── sdlc-quinn.md         # Quinn   — e2e, perf
+    │   └── sdlc-devon.md         # Devon   — review, fix
     └── skills/
-        ├── sdlc-ingest/SKILL.md           →  /sdlc-ingest      (Stage 1)
-        ├── sdlc-clarify/SKILL.md          →  /sdlc-clarify     (Stage 1b)
-        ├── sdlc-plan/SKILL.md             →  /sdlc-plan        (Stage 2)
-        ├── sdlc-breakdown/SKILL.md        →  /sdlc-breakdown   (Stage 2b)
-        ├── sdlc-sprint/SKILL.md           →  /sdlc-sprint      (Stage 2b alias)
-        ├── sdlc-build/SKILL.md            →  /sdlc-build       (Stage 4)
-        ├── sdlc-commit/SKILL.md           →  /sdlc-commit      (Stage 4b)
-        ├── sdlc-e2e/SKILL.md              →  /sdlc-e2e         (Stage QA-A)
-        ├── sdlc-perf/SKILL.md             →  /sdlc-perf        (Stage QA-B)
-        ├── sdlc-review/SKILL.md           →  /sdlc-review      (Stage 5)
-        ├── sdlc-fix/SKILL.md              →  /sdlc-fix         (Stage 6)
-        └── sdlc-status/SKILL.md           →  /sdlc-status      (any time)
+        └── sdlc/
+            └── SKILL.md          # /sdlc orchestrator
 ```
 
 ---
 
-## How state is passed between stages
+## State file
 
-Each skill reads and writes `.claude/sdlc-state.json` (git-ignored). This file is the pipeline's memory — no context is lost between commands.
+All agents read/write `.claude/sdlc-state.json` (added to `.gitignore` by the installer).
+This is the pipeline's shared memory — context is preserved across commands and agents.
 
-Each stage validates the expected prior stage before running:
+Key fields written by each stage:
 
-| Command | Requires state stage |
-|---------|----------------------|
-| `/sdlc-clarify` | `ingest` |
-| `/sdlc-plan` | `ingest` or `clarify` |
-| `/sdlc-build` | `sprint` |
-| `/sdlc-commit` | `build` + `coverage_pct >= 80` + `tdd_cycle: "complete"` |
-| `/sdlc-e2e` | `commit` or `review` |
-| `/sdlc-perf` | `commit`, `review`, or `e2e` |
-| `/sdlc-review` | `commit` |
-| `/sdlc-fix` | `review` |
+| Stage    | Fields written                                              |
+|----------|-------------------------------------------------------------|
+| ingest   | `epic`, `stories`, `acceptance_criteria`, `nfr`, `open_questions` |
+| plan     | `jira_project`, `cards`, `dependency_order`                 |
+| sprint   | `sprint`, `committed_stories`, `capacity_points`            |
+| build    | `current_card`, `branch`, `coverage_pct`, `tdd_cycle`       |
+| commit   | `pr_number`, `pr_url`                                       |
+| review   | `review_result`, `blockers`, `ci_passing`                   |
 
 ---
 
@@ -184,16 +161,18 @@ Each stage validates the expected prior stage before running:
 
 - **Branch naming:** `feature/<jira-card-id>-<short-description>`
 - **Commit style:** Conventional Commits — `feat:`, `fix:`, `test:`, `refactor:`
-- **TDD cycle:** Red → Green → Refactor. Never skip writing tests first.
-- **PR description** must reference the Jira card ID.
+- **TDD cycle:** Red → Green → Refactor. Tests always written first.
 - **Coverage threshold:** 80% minimum before a PR is production-ready.
-- **E2E selectors:** Always use `data-testid` attributes — never CSS classes or text.
-- **Performance thresholds:** Derived directly from Winston's captured NFRs.
+- **PR description** must reference the Jira card ID.
+- **E2E selectors:** Always `data-testid` — never CSS classes or text content.
+- **Performance thresholds:** Hard pass/fail, derived from Winston's NFRs.
 
 ---
 
 ## Updating the plugin
+
 ```bash
 bash /path/to/sdlc-claude-plugin/install.sh
 ```
-Re-running install updates all skills and personas in place.
+
+Re-running install updates all agents and the orchestrator skill in place.
