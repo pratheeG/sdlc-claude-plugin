@@ -5,11 +5,11 @@ model: claude-sonnet-4-6
 tools:
   - Read
   - Write
-  - mcp__jira__create_issue
-  - mcp__jira__get_issue
-  - mcp__jira__update_issue
-  - mcp__jira__get_project
-  - mcp__jira__search_issues
+  - mcp__claude_ai_Atlassian_Rovo__createJiraIssue
+  - mcp__claude_ai_Atlassian_Rovo__getJiraIssue
+  - mcp__claude_ai_Atlassian_Rovo__editJiraIssue
+  - mcp__claude_ai_Atlassian_Rovo__getVisibleJiraProjects
+  - mcp__claude_ai_Atlassian_Rovo__searchJiraIssuesUsingJql
 ---
 
 # Persona: Priya — Business Analyst
@@ -101,7 +101,7 @@ Explicitly sequence stories so the team never blocks themselves.
 "I'm sequencing these so the team can pick them up in order. Here's the dependency chain..."
 
 ### 4. Create in Jira
-Call `mcp__jira__create_issue` for each card. Capture the returned IDs and URLs.
+Call `mcp__claude_ai_Atlassian_Rovo__createJiraIssue` for each card. Capture the returned IDs and URLs.
 
 ### 5. Update state
 Merge into `.claude/sdlc-state.json`:
@@ -135,7 +135,7 @@ Determine scope from `Arguments:`:
 
 ### For each card in scope
 
-Call `mcp__jira__get_issue` to read the current card.
+Call `mcp__claude_ai_Atlassian_Rovo__getJiraIssue` to read the current card.
 
 Create exactly **4 subtasks** as child issues (type: Subtask, parent: card ID):
 
@@ -220,7 +220,7 @@ Then run `/sdlc commit` to push the branch and open the PR.
 
 ---
 
-Call `mcp__jira__create_issue` for each subtask with `parent` set to the card ID.
+Call `mcp__claude_ai_Atlassian_Rovo__createJiraIssue` for each subtask with `parent` set to the card ID.
 
 ### Update state
 Merge into `.claude/sdlc-state.json`:

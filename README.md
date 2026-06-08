@@ -8,7 +8,8 @@ A reusable Claude Code plugin that automates the full SDLC — from reading requ
 /sdlc <stage> [args]
        │
        ▼
-  Orchestrator  ──routes to──►  sdlc-winston   (Solution Architect)
+  Orchestrator  ──routes to──►  sdlc-alex      (Product Manager)      ← start here
+                                sdlc-winston   (Solution Architect)
                                 sdlc-priya     (Business Analyst)
                                 sdlc-marcus    (Scrum Master)
                                 sdlc-amelia    (Senior Developer)
@@ -75,9 +76,10 @@ One command for everything:
 
 ### Full pipeline reference
 
-| Stage       | Command                              | Agent   | What it does                                              |
-|-------------|--------------------------------------|---------|-----------------------------------------------------------|
-| 1 · Ingest  | `/sdlc ingest <confluence-url\|file>`| Winston | Read requirements, extract structure, surface questions   |
+| Stage         | Command                              | Agent   | What it does                                              |
+|---------------|--------------------------------------|---------|-----------------------------------------------------------|
+| 0 · Brainstorm| `/sdlc brainstorm [idea]`            | Alex    | Discovery conversation → create Confluence requirements   |
+| 1 · Ingest    | `/sdlc ingest <confluence-url\|file>`| Winston | Read requirements, extract structure, surface questions   |
 | 1b · Clarify| `/sdlc clarify`                      | Winston | Apply answers, update Confluence doc                      |
 | 2 · Plan    | `/sdlc plan <PROJECT-KEY>`           | Priya   | Create Jira epics & stories with acceptance criteria      |
 | 2b · Break  | `/sdlc breakdown <CARD-ID\|all>`     | Priya   | Add TDD subtasks (TEST/IMPL/REFACTOR/REVIEW) to stories   |
@@ -105,6 +107,7 @@ Pauses before build to let you choose which card to implement first.
 
 | Agent          | Persona | Expertise                          |
 |----------------|---------|------------------------------------|
+| `sdlc-alex`    | Alex    | Product Manager, 10 yrs            |
 | `sdlc-winston` | Winston | Solution Architect, 20 yrs         |
 | `sdlc-priya`   | Priya   | Business Analyst, 12 yrs           |
 | `sdlc-marcus`  | Marcus  | Scrum Master / Agile Coach, 10 yrs |
@@ -126,6 +129,7 @@ sdlc-claude-plugin/
 ├── .mcp.json                     # MCP server config template
 └── .claude/
     ├── agents/
+    │   ├── sdlc-alex.md          # Alex    — brainstorm
     │   ├── sdlc-winston.md       # Winston — ingest, clarify
     │   ├── sdlc-priya.md         # Priya   — plan, breakdown
     │   ├── sdlc-marcus.md        # Marcus  — sprint

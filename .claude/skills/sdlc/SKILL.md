@@ -1,5 +1,5 @@
 ---
-description: SDLC Orchestrator — single entry point for the entire pipeline. Routes commands to the correct persona sub-agent (Winston, Priya, Marcus, Amelia, Quinn, Devon), manages state handoffs, and supports full auto-run mode. Usage: /sdlc <stage> [args] — e.g. /sdlc ingest <url>, /sdlc plan PROJ, /sdlc build PROJ-42, /sdlc pipeline <url> PROJ.
+description: SDLC Orchestrator — single entry point for the entire pipeline. Routes commands to the correct persona sub-agent (Alex, Winston, Priya, Marcus, Amelia, Quinn, Devon), manages state handoffs, and supports full auto-run mode. Usage: /sdlc <stage> [args] — e.g. /sdlc brainstorm "feature idea", /sdlc ingest <url>, /sdlc plan PROJ, /sdlc build PROJ-42, /sdlc pipeline <url> PROJ.
 allowed-tools: Read, Write, Agent
 ---
 
@@ -13,21 +13,26 @@ You do NOT perform SDLC work yourself. You delegate everything to the right expe
 
 ## Stage → Agent Routing Table
 
-| Stage     | Sub-agent    | Required args              | Description                              |
-|-----------|--------------|----------------------------|------------------------------------------|
-| ingest    | sdlc-winston | `<confluence-url\|file>`   | Extract requirements, surface questions  |
-| clarify   | sdlc-winston | —                          | Apply answers, update source doc         |
-| plan      | sdlc-priya   | `<JIRA-PROJECT-KEY>`       | Create Jira epics + user stories         |
-| breakdown | sdlc-priya   | `<CARD-ID or all>`         | Add TDD subtasks to stories              |
-| sprint    | sdlc-marcus  | `[sprint-name]`            | Check DoR, populate sprint board         |
-| build     | sdlc-amelia  | `<CARD-ID>`                | TDD implementation — Red/Green/Refactor  |
-| commit    | sdlc-amelia  | —                          | Push branch, open GitHub PR              |
-| e2e       | sdlc-quinn   | `<CARD-ID>`                | Write Playwright E2E tests               |
-| perf      | sdlc-quinn   | `<CARD-ID>`                | Write K6 load/stress/spike/soak tests    |
-| review    | sdlc-devon   | —                          | Three-lens code review, post PR comments |
-| fix       | sdlc-devon   | —                          | Autonomous fix loop until CI is green    |
-| status    | (inline)     | —                          | Show pipeline dashboard                  |
-| pipeline  | all agents   | `<url> <PROJECT-KEY>`      | Auto-run full pipeline stages 1–3        |
+| Stage       | Sub-agent    | Required args              | Description                                        |
+|-------------|--------------|----------------------------|----------------------------------------------------|
+| brainstorm  | sdlc-alex    | `[rough idea or problem]`  | Discovery conversation → create Confluence page    |
+| ingest      | sdlc-winston | `<confluence-url\|file>`   | Extract requirements, surface questions            |
+| clarify     | sdlc-winston | —                          | Apply answers, update source doc                   |
+| plan        | sdlc-priya   | `<JIRA-PROJECT-KEY>`       | Create Jira epics + user stories                   |
+| breakdown   | sdlc-priya   | `<CARD-ID or all>`         | Add TDD subtasks to stories                        |
+| sprint      | sdlc-marcus  | `[sprint-name]`            | Check DoR, populate sprint board                   |
+| build       | sdlc-amelia  | `<CARD-ID>`                | TDD implementation — Red/Green/Refactor            |
+| commit      | sdlc-amelia  | —                          | Run final checks and push branch                   |
+| pr          | sdlc-amelia  | —                          | Open GitHub PR (HITL — run after reviewing branch) |
+| qa          | sdlc-quinn   | `<CARD-ID> [types...]`     | HITL menu: pick test types, then run selected      |
+| e2e         | sdlc-quinn   | `<CARD-ID>`                | Playwright E2E tests — full user journeys          |
+| smoke       | sdlc-quinn   | `<CARD-ID>`                | Critical-path smoke tests for post-deploy checks   |
+| acceptance  | sdlc-quinn   | `<CARD-ID>`                | AC-driven tests — one test per Given/When/Then     |
+| perf        | sdlc-quinn   | `<CARD-ID>`                | K6 load/stress/spike/soak tests from NFR SLAs      |
+| review      | sdlc-devon   | —                          | Three-lens code review, post PR comments           |
+| fix         | sdlc-devon   | —                          | Autonomous fix loop until CI is green              |
+| status      | (inline)     | —                          | Show pipeline dashboard                            |
+| pipeline    | all agents   | `<url> <PROJECT-KEY>`      | Auto-run full pipeline stages 1–3                  |
 
 ---
 
@@ -56,8 +61,12 @@ If `stage = status`:
   Stage 3  · Sprint     Marcus    [✅/⏳/⬜]
   Stage 4a · Build      Amelia    [✅/⏳/⬜]
   Stage 4b · Commit     Amelia    [✅/⏳/⬜]
-  QA-A     · E2E        Quinn     [✅/⏳/⬜/skipped]
-  QA-B     · Perf       Quinn     [✅/⏳/⬜/skipped]
+  Stage 4c · PR         Amelia    [✅/⏳/⬜/skipped]
+  QA       · Selection   Quinn     [✅/⏳/⬜]
+  QA-A     · Smoke       Quinn     [✅/⏳/⬜/skipped]
+  QA-B     · Acceptance  Quinn     [✅/⏳/⬜/skipped]
+  QA-C     · E2E         Quinn     [✅/⏳/⬜/skipped]
+  QA-D     · Performance Quinn     [✅/⏳/⬜/skipped]
   Stage 5  · Review     Devon     [✅/⏳/⬜]
   Stage 6  · Fix        Devon     [✅/⏳/⬜/skipped]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -104,15 +113,24 @@ Example for `ingest`:
 
 The agent runs in its own isolated context with the tools and instructions defined in its agent file. It writes the updated state directly to `.claude/sdlc-state.json`.
 
-### Step 6 — Confirm completion
+### Step 6 — Confirm completion and handle CHAIN signal
 
 After the agent returns:
 1. Read `.claude/sdlc-state.json` to confirm the stage was updated
-2. Report to the user:
-   - Which persona ran (e.g. "Winston (Solution Architect) completed Stage 1")
-   - Key artifacts created (cards created, branch name, PR URL, test files, etc.)
+2. Check the agent's output for a `CHAIN: <stage> <args>` line
+   - If present, automatically spawn the next agent using the stage and args from the CHAIN line — no user input needed
+   - If absent, report to the user and stop
+3. Report to the user:
+   - Which persona ran (e.g. "Alex (Product Manager) completed Stage 0")
+   - Key artifacts created (Confluence page URL, cards created, branch name, PR URL, etc.)
    - What was written to state
-   - **Next command:** `/sdlc <next-stage> [args]`
+   - **Next command:** `/sdlc <next-stage> [args]` (or "chaining automatically to Winston..." if CHAIN was present)
+
+**CHAIN signal** — used by Alex (brainstorm) to automatically hand off to Winston (ingest):
+```
+CHAIN: ingest <confluence-page-url>
+```
+When the orchestrator sees this in Alex's output, it immediately spawns `sdlc-winston` for `ingest` with the provided URL. This creates a seamless brainstorm → requirements review flow without requiring user intervention.
 
 ---
 

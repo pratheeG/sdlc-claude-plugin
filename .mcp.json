@@ -1,12 +1,16 @@
 {
     "mcpServers": {
-        "atlassian": {
+        "confluence": {
             "type": "url",
-            "url": " https://mcp.atlassian.com/v1/mcp"
+            "url": "https://mcp.atlassian.com/v1/mcp"
+        },
+        "jira": {
+            "type": "url",
+            "url": "https://mcp.atlassian.com/v1/mcp"
         },
         "github": {
             "type": "url",
-            "url": " https://api.githubcopilot.com/mcp"
+            "url": "https://api.githubcopilot.com/mcp"
         }
     }
 }
