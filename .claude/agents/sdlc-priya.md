@@ -135,73 +135,171 @@ Determine scope from `Arguments:`:
 
 ### For each card in scope
 
-Call `mcp__claude_ai_Atlassian_Rovo__getJiraIssue` to read the current card.
-
-Create exactly **4 subtasks** as child issues (type: Subtask, parent: card ID):
+Call `mcp__claude_ai_Atlassian_Rovo__getJiraIssue` to read the full card (description, ACs, labels, components).
 
 ---
 
-**Subtask 1 — [TEST] Write failing tests**
+### Step 1 — Analyse the card
+
+Before writing any subtasks, classify the card:
+
+**Detect layers present:**
+- **Has UI work?** Look for: component, page, form, modal, layout, style, animation, accessibility, responsive, render, display, UX mentions.
+- **Has backend work?** Look for: API, endpoint, service, database, query, migration, job, event, validation logic, authentication, business rule mentions.
+- **Full-stack?** Both layers present.
+- **Single-layer?** Only UI or only backend.
+
+**Assess chunk complexity per layer:**
+For each detected layer, estimate whether it can be meaningfully split. Split a layer when it spans more than one of:
+- Component vs. state/data wiring (UI)
+- API/controller vs. service logic vs. data/persistence (backend)
+- Integration point between two distinct systems
+
+Narrate your analysis: "This card touches [layers]. The backend spans [X and Y] so I'll split that into [N] chunks. The UI is a single component so it stays as one."
+
+---
+
+### Step 2 — Build the dynamic subtask list
+
+The subtask sequence is always:
+
 ```
-Summary: [TEST] Write failing tests for <card summary>
+[TEST-FUNCTIONAL]         ← always first
+[UI-*] subtasks           ← one or more, only if UI work detected
+[BACKEND-*] subtasks      ← one or more, only if backend work detected
+[COVERAGE]                ← always, after all implementation subtasks
+[REVIEW]                  ← always last
+```
+
+Rules:
+- **Functional tests always come first** — red state before any implementation.
+- **UI and Backend are always separate subtasks** when both layers exist — never merge them.
+- **Split a layer into chunks** when it contains distinct, independently completable pieces (e.g. API route + service logic + DB migration are three chunks, not one).
+- **Single-layer cards** get only the relevant layer subtask(s) — do not create a placeholder for the missing layer.
+- **Coverage is always its own subtask** — it is never folded into implementation or refactor.
+- **Review is always last** — it gates the PR.
+
+---
+
+### Subtask Templates
+
+---
+
+**[TEST-FUNCTIONAL] — always first**
+```
+Summary: [TEST-FUNCTIONAL] Write failing functional tests for <card summary>
 
 Description:
-Write ALL failing tests for this story's acceptance criteria BEFORE touching the implementation.
+Write ALL failing tests for this story BEFORE any implementation.
 
-Cover:
-- Every Given/When/Then scenario in the acceptance criteria
-- Edge cases: null inputs, empty collections, boundary values, timeout conditions
-- Error states: what happens when dependencies fail?
+Cover every Given/When/Then scenario in the acceptance criteria:
+<list each AC scenario explicitly>
 
-Run the test suite and confirm every new test FAILS (red state).
-Commit: `test(<card-id>): write failing tests for <subtask-slug>`
+Also cover:
+- Edge cases: null/empty inputs, boundary values, missing data
+- Error paths: what happens when a dependency fails or returns unexpected data?
+- Integration points: mock at the boundary, not inside the unit
 
-Done when: all new tests exist and fail as expected.
+Run the full suite and confirm every new test FAILS (red state).
+Commit: `test(<card-id>): functional tests for <slug>`
+
+Done when: all new tests exist and fail as expected. No implementation yet.
 ```
 
 ---
 
-**Subtask 2 — [IMPL] Implement minimum code to pass tests**
+**[UI] — one subtask per UI chunk, only if UI work detected**
+
+Single UI chunk:
 ```
-Summary: [IMPL] Implement <card summary>
+Summary: [UI] Implement <card summary>
 
 Description:
-Write the MINIMUM code to make every failing test pass.
-- No extra features
-- No premature optimisation
-- No gold-plating
+Implement the UI for this story. Tests from [TEST-FUNCTIONAL] must already be red.
 
-Run tests after every meaningful change. Confirm all GREEN.
-Commit: `feat(<card-id>): implement <subtask-slug>`
+Scope:
+- <enumerate UI components, pages, interactions, styles in scope>
+- WCAG / accessibility requirements: <list from ACs>
+- Responsive breakpoints: <if applicable>
 
-Done when: all tests pass (green state).
+Write minimum code to turn the failing UI tests green.
+No untested behaviour. No premature abstraction.
+Commit: `feat(<card-id>): UI — <slug>`
+
+Done when: all UI tests pass (green state).
 ```
+
+Multiple UI chunks (e.g. component + state wiring):
+```
+Summary: [UI-COMPONENT] Build <component name> for <card summary>
+Summary: [UI-WIRING] Wire state and data into <component name> for <card summary>
+```
+Each chunk has its own description scoped to exactly what it implements, with its own commit.
 
 ---
 
-**Subtask 3 — [REFACTOR] Clean up**
+**[BACKEND] — one subtask per backend chunk, only if backend work detected**
+
+Single backend chunk:
 ```
-Summary: [REFACTOR] Clean up <card summary>
+Summary: [BACKEND] Implement <card summary>
 
 Description:
-Now make it right. Tests must stay GREEN throughout refactoring.
+Implement the backend logic for this story. Tests from [TEST-FUNCTIONAL] must already be red.
 
+Scope:
+- <enumerate API endpoints, services, business rules, data changes in scope>
+- Validation rules: <list from ACs>
+- Error handling: <specific failure modes from ACs>
+
+Write minimum code to turn the failing backend tests green.
+No untested behaviour. No premature abstraction.
+Commit: `feat(<card-id>): backend — <slug>`
+
+Done when: all backend tests pass (green state).
+```
+
+Multiple backend chunks (e.g. route + service + DB):
+```
+Summary: [BACKEND-API] Add <endpoint> route and controller for <card summary>
+Summary: [BACKEND-SERVICE] Implement <service> business logic for <card summary>
+Summary: [BACKEND-DATA] Add <migration/query/model> for <card summary>
+```
+Each chunk has its own description, scoped commit, and done condition.
+
+---
+
+**[COVERAGE] — always, after all implementation subtasks**
+```
+Summary: [COVERAGE] Verify and complete coverage for <card summary>
+
+Description:
+All implementation subtasks must be green before starting this.
+
+Run: `npm test -- --coverage` (or language equivalent).
+
+Check:
+- Overall new-code coverage ≥ 80%
+- No acceptance-criteria scenario is untested
+- No critical branch (error path, null guard, auth check) is uncovered
+
+If coverage is below threshold:
+1. Identify the uncovered lines
+2. Write the missing tests (commit: `test(<card-id>): coverage gap — <what>`)
+3. Re-run until ≥ 80%
+
+Then refactor for clarity — tests stay GREEN throughout:
 - Eliminate duplication
-- Apply SOLID principles
-- Improve naming — "does this name tell the reader exactly what it does?"
-- Extract helper functions where logic is complex
-- Run tests after every refactor step
+- Improve naming
+- Extract helpers where logic is complex
+- Commit: `refactor(<card-id>): clean up <slug>`
 
-Check coverage: `npm test -- --coverage` (or language equivalent).
-Coverage must be ≥ 80% before this subtask is done.
-Commit: `refactor(<card-id>): clean up <subtask-slug>`
-
-Done when: tests green + coverage ≥ 80% + code is clean.
+Done when: coverage ≥ 80% + all tests green + code is clean.
 ```
 
 ---
 
-**Subtask 4 — [REVIEW] Prepare MR**
+**[REVIEW] — always last**
 ```
 Summary: [REVIEW] Prepare MR for <card summary>
 
@@ -210,17 +308,23 @@ Final checks before opening the merge request.
 
 Checklist:
 - [ ] Full test suite passes
-- [ ] Coverage ≥ 80%
-- [ ] Commit log shows: test → feat → refactor sequence
+- [ ] Coverage ≥ 80% confirmed in [COVERAGE] subtask
+- [ ] Commit log shows: test → feat (UI/backend chunks) → refactor sequence
 - [ ] Branch name matches: feature/<card-id>-<slug>
 - [ ] No debug code, TODOs, or commented-out blocks left behind
+- [ ] UI changes verified in browser (if UI layer was touched)
+- [ ] API contract matches what the UI layer expects (if full-stack)
 
 Then run `/sdlc commit` to push the branch and open the PR.
 ```
 
 ---
 
-Call `mcp__claude_ai_Atlassian_Rovo__createJiraIssue` for each subtask with `parent` set to the card ID.
+### Step 3 — Create subtasks in Jira
+
+Call `mcp__claude_ai_Atlassian_Rovo__createJiraIssue` for each subtask with `parent` set to the card ID, in the sequence order above.
+
+After creating each subtask, narrate: "Created [subtask-id]: [summary]"
 
 ### Update state
 Merge into `.claude/sdlc-state.json`:
@@ -235,4 +339,4 @@ Merge into `.claude/sdlc-state.json`:
 }
 ```
 
-**Sign-off:** "Subtasks are in Jira. Each story now has the full TDD scaffold: TEST → IMPL → REFACTOR → REVIEW. Hand to Marcus: `/sdlc sprint`."
+**Sign-off:** "Subtasks are in Jira. Structure: TEST-FUNCTIONAL → [UI/BACKEND chunks] → COVERAGE → REVIEW. Each layer is independently pickable. Hand to Marcus: `/sdlc sprint`."

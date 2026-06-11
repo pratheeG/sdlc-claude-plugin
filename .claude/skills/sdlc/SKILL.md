@@ -32,6 +32,7 @@ You do NOT perform SDLC work yourself. You delegate everything to the right expe
 | review      | sdlc-devon   | —                          | Three-lens code review, post PR comments           |
 | fix         | sdlc-devon   | —                          | Autonomous fix loop until CI is green              |
 | status      | (inline)     | —                          | Show pipeline dashboard                            |
+| stats       | (inline)     | —                          | Show session token usage and productivity stats    |
 | pipeline    | all agents   | `<url> <PROJECT-KEY>`      | Auto-run full pipeline stages 1–3                  |
 
 ---
@@ -89,6 +90,45 @@ Print the dashboard and stop. Do NOT spawn any agent.
 
 ---
 
+### Step 3b — Handle `stats` inline (no agent spawn)
+
+If `stage = stats`:
+
+Read `state.session_stats` (array). If absent or empty, print:
+```
+No stats recorded yet for this session. Run any /sdlc stage first.
+```
+and stop.
+
+Otherwise compute totals and render:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SDLC Session Stats · <state.current_card or state.epic.id or "—">
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Stage        Agent      Tokens     Tools   Duration
+  ──────────── ────────── ────────── ──────  ────────
+  <stage>      <persona>  <tokens>   <tools> <Xm Ys>
+  ...one row per entry in session_stats...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Total tokens:    <sum of all tokens>
+  Total tool uses: <sum of all tool_uses>
+  Total duration:  <sum of all duration_ms formatted as Xm Ys>
+  Stages run:      <count of entries>
+  Avg tokens/stage: <total_tokens / stages_run>
+  Most expensive:  <stage with highest token count> (<tokens> tokens)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+Format rules:
+- `duration_ms` → convert to `Xm Ys` (e.g. 273947 → `4m 33s`)
+- Tokens → comma-separated thousands (e.g. 37416 → `37,416`)
+- Right-align numeric columns for readability
+
+Print the stats table and stop. Do NOT spawn any agent.
+
+---
+
 ### Step 4 — Build the agent prompt
 
 Construct this prompt for the sub-agent:
@@ -113,10 +153,77 @@ Example for `ingest`:
 
 The agent runs in its own isolated context with the tools and instructions defined in its agent file. It writes the updated state directly to `.claude/sdlc-state.json`.
 
-### Step 6 — Confirm completion and handle CHAIN signal
+### Step 6 — Confirm completion and handle signals
 
 After the agent returns:
 1. Read `.claude/sdlc-state.json` to confirm the stage was updated
+
+#### 6-pre — Capture usage stats
+
+The agent result contains a `<usage>` block at the end:
+```
+<usage>total_tokens: 37416
+tool_uses: 17
+duration_ms: 273947
+</usage>
+```
+
+Parse these three values (default to 0 if absent). Then merge a new entry into `state.session_stats`:
+
+```json
+{
+  "stage": "<stage that just ran>",
+  "persona": "<state.persona from updated state>",
+  "total_tokens": 37416,
+  "tool_uses": 17,
+  "duration_ms": 273947,
+  "timestamp": "<ISO 8601 now>"
+}
+```
+
+Merge into `state.session_stats` array (create the array if it doesn't exist) using these rules:
+
+**For the `fix` stage:** always append a new entry. Each iteration is distinct work and should be individually recorded.
+
+**For all other stages:** upsert by `(stage + current_card)` key:
+- If an entry already exists with the same `stage` and `card` values, replace it with the new entry.
+- If no matching entry exists, append the new entry.
+
+This means re-running `/sdlc build KAN-31` updates its row in place rather than duplicating it, while every fix iteration gets its own row.
+
+Write the updated state back to `.claude/sdlc-state.json` before proceeding to 6a/6b.
+
+#### 6a — Fix loop continuation (Devon `fix` stage only)
+
+If the stage that just ran was `fix`, check `state.loop_continue`:
+
+**`loop_continue: true`** — Devon completed one iteration but failures remain:
+```
+Fix iteration <state.fix_iteration> complete.
+Still failing: <state.failures_remaining>
+Re-spawning Devon for next iteration...
+```
+Go back to Step 4, rebuild the prompt for `fix`, and spawn `sdlc-devon` again.
+Repeat until `loop_continue` is `false`.
+
+**`loop_continue: false` + `all_green: true`** — fix loop succeeded:
+```
+✅ All green after <state.fix_iteration> iteration(s)!
+Tests passing · CI green · No unresolved comments
+PR <state.pr_url> is ready to merge. 🟢
+```
+Stop. Do NOT chain further.
+
+**`loop_continue: false` + `escalated: true`** — iteration limit reached:
+```
+⚠️  Devon hit the 5-iteration limit and could not resolve all failures.
+Manual intervention required. Check the PR for Devon's escalation comment:
+<state.pr_url>
+```
+Stop. Do NOT chain further.
+
+#### 6b — CHAIN signal (all other stages)
+
 2. Check the agent's output for a `CHAIN: <stage> <args>` line
    - If present, automatically spawn the next agent using the stage and args from the CHAIN line — no user input needed
    - If absent, report to the user and stop

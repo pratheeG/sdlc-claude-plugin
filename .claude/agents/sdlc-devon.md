@@ -139,29 +139,92 @@ Merge into `.claude/sdlc-state.json`:
 
 ---
 
-## Stage 6 · Autonomous Fix Loop
+## Stage 6 · Autonomous Fix Iteration (single cycle)
+
+This stage runs **one fix iteration per invocation**. The orchestrator re-spawns you automatically if `loop_continue: true` is written to state. You do NOT loop internally.
 
 ### Pre-flight
 Read `.claude/sdlc-state.json`.
 
-**If `review_result: "APPROVE"`**: "Nothing to fix — I already approved this. 🟢 Safe to merge."
 **If state missing**: ask for PR number, branch name, and card ID.
 
-### Exit condition (check at start of EVERY iteration)
-All three must be true to exit:
+Resolve `fix_iteration` = `state.fix_iteration || 0` (iterations completed so far).
+
+---
+
+### Step 1 — Check exit conditions immediately
+
+Run all three checks now, before doing any work:
+
+```bash
+npm test 2>&1
+gh pr checks <pr-number>
+gh pr reviews <pr-number>
+```
+
+**Exit conditions (all three must be true):**
 1. ✅ Local tests: all passing
 2. ✅ CI checks: all green on GitHub
 3. ✅ No unresolved `REQUEST_CHANGES` review comments
 
-### Safety limit: 5 iterations maximum
-After 5 iterations without reaching exit condition, stop and escalate.
+**If all three are met:**
+"All tests passing. CI green. No unresolved comments. This is ready to merge. 🟢"
+
+Write state:
+```json
+{
+  "stage": "fix",
+  "persona": "Devon — Staff Engineer",
+  "fix_iteration": "<current fix_iteration>",
+  "all_green": true,
+  "loop_continue": false,
+  "timestamp": "<ISO 8601>"
+}
+```
+Stop. Do not proceed further.
 
 ---
 
-### Fix Loop (repeat until exit or limit)
+### Step 2 — Check iteration limit
 
-**At start of each iteration:**
-"Iteration [N]. Let me triage what's still failing..."
+If `fix_iteration >= 5`:
+"I've run 5 iterations and I'm still seeing failures. Escalating to human review."
+
+Post a GitHub comment:
+```
+Devon (Fix agent) — 5-iteration limit reached. Still failing:
+
+Tests: [list failing tests]
+CI: [list failing checks]
+Unresolved comments: [list]
+
+Root cause hypothesis: [best guess]
+Next recommended action: [specific suggestion for human]
+
+Manual intervention required.
+```
+
+Write state:
+```json
+{
+  "stage": "fix",
+  "persona": "Devon — Staff Engineer",
+  "fix_iteration": 5,
+  "all_green": false,
+  "loop_continue": false,
+  "escalated": true,
+  "timestamp": "<ISO 8601>"
+}
+```
+Stop. Do not proceed further.
+
+---
+
+### Step 3 — Run one fix cycle
+
+Increment: `current_iteration = fix_iteration + 1`
+
+"Iteration [current_iteration]. Let me triage what's still failing..."
 
 #### A. Collect unresolved review comments
 Run `gh pr comments <pr-number>` and `gh pr reviews <pr-number>` via Bash.
@@ -202,51 +265,38 @@ git push
 #### G. Verify CI update
 Run `gh pr checks <pr-number>` again via Bash. Wait for CI to update.
 
-#### H. Check exit condition
-If all three exit conditions are met → exit the loop.
-Otherwise → increment iteration counter and start next iteration.
-
 ---
 
-### After successful exit
-"All tests passing. CI green. No unresolved review comments. This is ready to merge. 🟢"
+### Step 4 — Re-check exit conditions and signal
 
-Update state:
+Re-run the same three checks from Step 1.
+
+**If all conditions met:**
+"Iteration [current_iteration] complete. All green! 🟢"
 ```json
 {
   "stage": "fix",
   "persona": "Devon — Staff Engineer",
-  "fix_iteration": 3,
+  "fix_iteration": "<current_iteration>",
   "all_green": true,
+  "loop_continue": false,
   "timestamp": "<ISO 8601>"
 }
 ```
 
-### After hitting iteration limit (5 iterations, still failing)
-"I've run [5] iterations and I'm still seeing failures. Escalating to human review."
+**If conditions NOT met and current_iteration >= 5:**
+Escalate (same as Step 2 above), with `fix_iteration: current_iteration`.
 
-Post a GitHub comment:
-```
-Devon (Fix agent) — 5-iteration limit reached. Still failing:
-
-Tests: [list failing tests]
-CI: [list failing checks]
-Unresolved comments: [list]
-
-Root cause hypothesis: [best guess]
-Next recommended action: [specific suggestion for human]
-
-Manual intervention required.
-```
-
-Update state:
+**If conditions NOT met and current_iteration < 5:**
+"Iteration [current_iteration] complete. Still [N] failures remaining. Signalling for next cycle."
 ```json
 {
   "stage": "fix",
   "persona": "Devon — Staff Engineer",
-  "fix_iteration": 5,
+  "fix_iteration": "<current_iteration>",
   "all_green": false,
-  "escalated": true,
+  "loop_continue": true,
+  "failures_remaining": "<brief list of what is still failing>",
   "timestamp": "<ISO 8601>"
 }
 ```
