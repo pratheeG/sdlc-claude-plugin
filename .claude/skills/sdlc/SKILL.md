@@ -224,20 +224,46 @@ Stop. Do NOT chain further.
 
 #### 6b — CHAIN signal (all other stages)
 
-2. Check the agent's output for a `CHAIN: <stage> <args>` line
-   - If present, automatically spawn the next agent using the stage and args from the CHAIN line — no user input needed
-   - If absent, report to the user and stop
-3. Report to the user:
-   - Which persona ran (e.g. "Alex (Product Manager) completed Stage 0")
-   - Key artifacts created (Confluence page URL, cards created, branch name, PR URL, etc.)
-   - What was written to state
-   - **Next command:** `/sdlc <next-stage> [args]` (or "chaining automatically to Winston..." if CHAIN was present)
+After the agent returns, apply **stage-specific CHAIN rules** before looking for any CHAIN signal in the output:
 
-**CHAIN signal** — used by Alex (brainstorm) to automatically hand off to Winston (ingest):
-```
-CHAIN: ingest <confluence-page-url>
-```
-When the orchestrator sees this in Alex's output, it immediately spawns `sdlc-winston` for `ingest` with the provided URL. This creates a seamless brainstorm → requirements review flow without requiring user intervention.
+**`ingest` completed:**
+- Read `state.open_questions` from the updated state file.
+- If `open_questions` is non-empty (length > 0):
+  - Print the questions list to the user clearly, numbered.
+  - Print: "Answer these questions, then run `/sdlc clarify` to apply them."
+  - **STOP. Do NOT chain to plan.** Ignore any CHAIN signal in the agent output.
+- If `open_questions` is empty or absent:
+  - Print: "No open questions. Chaining automatically to plan..."
+  - Spawn `sdlc-priya` for `plan <state.jira_project>`.
+
+**`clarify` completed:**
+- Always chain: spawn `sdlc-priya` for `plan <state.jira_project>`.
+- Print: "Clarifications applied. Chaining to plan..."
+
+**`plan` completed:**
+- Always chain: spawn `sdlc-priya` for `breakdown all`.
+- Print: "Cards created. Chaining to breakdown..."
+
+**`breakdown` completed:**
+- Always chain: spawn `sdlc-marcus` for `sprint`.
+- Print: "Subtasks added. Chaining to sprint planning..."
+
+**`brainstorm` completed:**
+- Check agent output for `CHAIN: ingest <url>`. If present, spawn `sdlc-winston` for `ingest <url>`.
+- This is the only stage where the CHAIN signal is read from agent output rather than being hardcoded here.
+
+**All other stages** (`sprint`, `build`, `commit`, `pr`, `qa`, `review`):
+- Do NOT auto-chain. These stages end with a human decision point.
+- Report to the user and stop.
+
+---
+
+**Report to the user after every stage (auto-chained or stopped):**
+- Which persona ran (e.g. "Priya (Business Analyst) completed Stage 2 — Plan")
+- Key artifacts created (Confluence page URL, cards created, branch name, PR URL, etc.)
+- What was written to state
+- **Next command** if stopped: `/sdlc <next-stage> [args]`
+- **Auto-chaining message** if continuing: "Chaining automatically to <stage>..."
 
 ---
 
@@ -245,6 +271,25 @@ When the orchestrator sees this in Alex's output, it immediately spawns `sdlc-wi
 
 Automatically chains stages 1 through 3 (requirements → planning → sprint board).
 Build/QA/Review stages always require human selection of a specific card — pipeline stops before those.
+
+### Resume from checkpoint
+
+Before starting, read `.claude/sdlc-state.json` and check `state.stage`:
+
+| `state.stage` value | Resume from |
+|---------------------|-------------|
+| not set / missing   | Step 1 — ingest |
+| `ingest`            | Step 1 — re-run ingest (state exists but may be incomplete) |
+| `clarify`           | Step 2 — skip ingest, run clarify with existing state |
+| `plan`              | Step 3 — skip ingest + clarify, run plan |
+| `breakdown`         | Step 4 — skip to breakdown |
+| `sprint`            | Step 5 — skip to sprint (or show "already at sprint" if `committed_stories` is populated) |
+
+Print the resume point before starting: "Resuming from [stage]..." or "Starting fresh pipeline..."
+
+If resuming mid-pipeline and `open_questions` is non-empty in state, stop immediately and show the questions before continuing. Do not skip the clarify gate.
+
+---
 
 **Sequence:**
 

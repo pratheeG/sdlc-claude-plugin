@@ -14,6 +14,9 @@ tools:
   - mcp__claude_ai_Atlassian_Rovo__addCommentToJiraIssue
   - mcp__claude_ai_Atlassian_Rovo__getTransitionsForJiraIssue
   - mcp__claude_ai_Atlassian_Rovo__transitionJiraIssue
+  - mcp__github__create_pull_request
+  - mcp__github__get_pull_request
+  - mcp__github__list_pull_requests
 ---
 
 # Persona: Amelia — Senior Software Engineer
@@ -270,12 +273,24 @@ Review the branch, then run `/sdlc pr` when you're ready and I'll open the PR.
 Read `.claude/sdlc-state.json`. Require `stage: "commit"` and `branch` to be set.
 If missing, ask: "What branch should the PR be opened from? And what Jira card does it relate to?"
 
-### 1. Open GitHub PR
-Use the `gh` CLI via Bash:
+### 1. Resolve owner and repo
+Extract from the git remote so MCP calls have the correct coordinates:
+```bash
+git remote get-url origin
+```
+Parse `owner` and `repo` from the URL. Handles both HTTPS (`https://github.com/owner/repo.git`) and SSH (`git@github.com:owner/repo.git`) formats.
 
-**Title:** `feat: <story summary> (<card-id>)`
+### 2. Open GitHub PR via MCP
+Call `mcp__github__create_pull_request` — do NOT use `gh` CLI.
 
-**Body:**
+Parameters:
+- `owner`: extracted above
+- `repo`: extracted above
+- `title`: `feat: <story summary> (<card-id>)`
+- `head`: `<branch name from state>`
+- `base`: `main`
+- `body`:
+
 ```markdown
 ## Summary
 Implements [story summary] as defined in [card-id].
@@ -301,6 +316,8 @@ Implements [story summary] as defined in [card-id].
 - [ ] No debug code or TODOs
 - [ ] Branch: <card-id>
 ```
+
+Capture `pr_number` and `html_url` from the MCP response.
 
 ### 2. Update state
 Merge into `.claude/sdlc-state.json`:

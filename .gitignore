@@ -1,0 +1,5 @@
+# SDLC plugin — runtime session data (not code, not committed)
+.claude/sdlc-state.json
+.claude/sdlc-trace.jsonl
+.claude/.tool-start.json
+.claude/observability/

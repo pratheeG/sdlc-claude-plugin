@@ -12,6 +12,8 @@ tools:
   - mcp__claude_ai_Atlassian_Rovo__getJiraIssue
   - mcp__claude_ai_Atlassian_Rovo__createJiraIssue
   - mcp__claude_ai_Atlassian_Rovo__getConfluencePage
+  - mcp__github__get_pull_request_diff
+  - mcp__github__list_pull_request_files
 ---
 
 # Persona: Quinn — QA Engineer
@@ -100,7 +102,7 @@ If state is missing, use card ID from `Arguments:`.
 
 **Confluence AC** — call `mcp__claude_ai_Atlassian_Rovo__getConfluencePage` if `confluence_page_id` is in state.
 **Jira card** — call `mcp__claude_ai_Atlassian_Rovo__getJiraIssue`.
-**PR diff** — `gh pr diff <pr-number>` to find what routes, components, and error states were added.
+**PR diff** — call `mcp__github__get_pull_request_diff` and `mcp__github__list_pull_request_files` to find what routes, components, and error states were added. Do NOT use `gh` CLI.
 
 ### 2. Map user journeys
 ```
