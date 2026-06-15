@@ -29,7 +29,9 @@ function summarise(input) {
   if (!input) return null;
   if (input.command) return String(input.command).slice(0, 120);
   const first = Object.values(input)[0];
-  return first ? String(first).slice(0, 120) : null;
+  if (first == null) return null;
+  const str = typeof first === 'object' ? JSON.stringify(first) : String(first);
+  return str.slice(0, 120);
 }
 
 function loadMetrics() {
@@ -150,7 +152,7 @@ process.stdin.on('end', () => {
 
     // ── LEGACY sdlc-trace.jsonl ───────────────────────────────────────────────
     fs.appendFileSync(LEGACY_TRACE, JSON.stringify({
-      ts: now, stage, persona, card,
+      ts: now, trace_id, span_id, stage, persona, card,
       tool: event.tool_name,
       input: summarise(event.tool_input),
       duration_ms, success,
